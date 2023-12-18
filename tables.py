@@ -1,5 +1,3 @@
-import datetime
-
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -7,8 +5,6 @@ from sqlalchemy.sql import func
 Base = declarative_base()
 metadata = Base.metadata
 
-
-# metadata = sqlalchemy.MetaData()
 
 users = sqlalchemy.Table(
     "users",
@@ -25,7 +21,6 @@ users = sqlalchemy.Table(
         "update_time",
         sqlalchemy.DateTime(timezone=True),
         nullable=False,
-        # server_default=sqlalchemy.text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
         server_default=func.now(),
     ),
 )
