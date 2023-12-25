@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, parseaddr
 from os.path import basename, isfile
 from urllib.parse import quote
+# from collections.abc import Iterable
 
 import orjson
 from starlette.responses import JSONResponse
@@ -15,6 +16,11 @@ import settings
 
 class OrjsonResponse(JSONResponse):
     def render(self, content: Any) -> bytes:
+        # if isinstance(content, Iterable):
+        #     content = {"status": "ok", "data": content}
+        # else:
+        #     content['status'] = 'ok'
+        content['status'] = 'ok'
         return orjson.dumps(content)
 
 
@@ -42,7 +48,9 @@ def _format_addr_list(addr_list):
     return ",".join(list(map(_format_addr, addr_list)))
 
 
-def _build_message(to, subject, content, cc=None, bcc=None, attachments=None, sender=None, **kwargs):
+def _build_message(
+    to, subject, content, cc=None, bcc=None, attachments=None, sender=None, **kwargs
+):
     if not sender:
         sender = "alert-bot"
     EMAIL_SENDER = f"{sender}<bozhou_0728@qq.com>"

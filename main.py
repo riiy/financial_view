@@ -4,15 +4,21 @@ import contextlib
 import databases
 import jwt
 import pyotp
+from loguru import logger
 from starlette.applications import Starlette
-from starlette.authentication import (AuthCredentials, AuthenticationBackend,
-                                      AuthenticationError, SimpleUser,
-                                      requires)
+from starlette.authentication import (
+    AuthCredentials,
+    AuthenticationBackend,
+    AuthenticationError,
+    SimpleUser,
+    requires,
+)
 from starlette.background import BackgroundTask
+from starlette.endpoints import HTTPEndpoint
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
-from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.routing import Mount, Route
 
@@ -24,24 +30,22 @@ database = databases.Database(settings.DATABASE_URL)
 tables = {}
 
 
-async def detail(request):
-    return OrjsonResponse({"hello": "world"})
+class Api(HTTPEndpoint):
+    async def get(self, request):
+        path = request.url.path.split("/")[-1]
+        table = tables[path]
+        query = table.select().filter_by(sysmbol="sz.000002")
+        results = await database.fetch_all(query)
+        return OrjsonResponse([dict(row) for row in results])
 
+    async def post(self, request):
+        return OrjsonResponse({"hello": "post"})
 
-async def list(request):
-    return OrjsonResponse({"hello": "world"})
+    async def put(self, request):
+        return OrjsonResponse({"hello": "put"})
 
-
-async def add(request):
-    return OrjsonResponse({"hello": "world"})
-
-
-async def update(request):
-    return OrjsonResponse({"hello": "world"})
-
-
-async def delete(request):
-    return OrjsonResponse({"hello": "world"})
+    async def delete(self, request):
+        return OrjsonResponse({"hello": "delete"})
 
 
 @requires("authenticated")
@@ -55,28 +59,24 @@ async def handler(request):
 
 model_routes = []
 for table in metadata.tables.values():
-    model_routes.append(Route(f"/{table.name.__str__()}", endpoint=handler))
+    if table.schema.__str__() in ["auth"]:
+        continue
+
+    model_routes.append(Route(f"/{table.name.__str__()}", endpoint=Api))
     tables[table.name.__str__()] = table
 
 
-def send_otp_email(to_address, otp_code):
-    """."""
-    content = f"{otp_code}"
-    send_mail("Finacial View verify code", content, to=[to_address])
+class Login(HTTPEndpoint):
+    def _gettotp(self, email):
+        b32str = base64.b32encode(bytearray(email, "ascii")).decode("utf-8")
+        totp = pyotp.TOTP(b32str, interval=settings.EMAIL_OTP_INTERVAL)
+        return totp
 
-
-async def login_otp(request):
-    req = await request.json()
-    email = req["email"]
-    b32str = base64.b32encode(bytearray(email, "ascii")).decode("utf-8")
-    totp = pyotp.TOTP(b32str, interval=settings.EMAIL_OTP_INTERVAL)
-    if "otp_code" not in req:
-        otp_code = totp.now()
-        task = BackgroundTask(send_otp_email, to_address=email, otp_code=otp_code)
-        message = {"detail": "check email", "interval": settings.EMAIL_OTP_INTERVAL}
-        return OrjsonResponse(message, background=task)
-    else:
-        if not totp.verify(req["otp_code"]):
+    async def post(self, request):
+        req = await request.json()
+        email = req["email"]
+        totp = self._gettotp(email)
+        if not totp.verify(req["captcha"]):
             raise HTTPException(status_code=401)
         value = {"email": email}
         query = "SELECT email FROM auth.user WHERE email = :email"
@@ -85,7 +85,25 @@ async def login_otp(request):
             query = user.insert()
             await database.execute(query=query, values=value)
         value["token"] = jwt.encode(value, str(settings.SECRET_KEY), algorithm="HS256")
+        value['type'] = 'email'
+        value['currentAuthority'] = 'user'
         return OrjsonResponse(value)
+
+    async def get(self, request):
+        email = request.query_params.get('email')
+        if not email:
+            raise HTTPException(status_code=401)
+        totp = self._gettotp(email)
+        otp_code = totp.now()
+        task = BackgroundTask(
+            send_mail,
+            subject="verify code",
+            content=otp_code,
+            to=[email],
+            sender="Finacial View",
+        )
+        message = {"detail": "check email", "interval": settings.EMAIL_OTP_INTERVAL}
+        return OrjsonResponse(message, background=task)
 
 
 class BasicAuthBackend(AuthenticationBackend):
@@ -96,29 +114,38 @@ class BasicAuthBackend(AuthenticationBackend):
         auth = conn.headers["Authorization"]
         try:
             scheme, credentials = auth.split()
-            print(credentials)
-            if scheme.lower() != "basic":
+            if scheme.lower() != "bearer":
                 return
         except Exception as exc:
-            print(exc.with_traceback)
+            logger.info(exc.with_traceback)
             raise AuthenticationError("Invalid basic auth credentials")
 
         decoded = jwt.decode(credentials, str(settings.SECRET_KEY), algorithms="HS256")
-        username = decoded["email"]
-        return AuthCredentials(["authenticated"]), SimpleUser(username)
+        email = decoded["email"]
+        return AuthCredentials(["authenticated"]), SimpleUser(email)
 
+@requires("authenticated")
+async def current_user(request):
+    """."""
+    user = request.user
+    logger.info(user.display_name)
+    user = {"email": user.display_name}
+    return OrjsonResponse(user)
+
+login_route = [
+    Route("/login/account", endpoint=Login),
+    Route("/login/captcha", methods=["GET"], endpoint=Login),
+    Route("/current-user", methods=["GET"], endpoint=current_user),
+
+]
 
 routes = [
-    Mount("/tables", routes=model_routes),
-    Mount("/auth", routes=[Route("/login-otp/", methods=["POST"], endpoint=login_otp)]),
+    Mount("/api", routes=model_routes + login_route),
 ]
 
 middleware = [
-    Middleware(
-        SessionMiddleware,
-        secret_key=settings.SECRET_KEY,
-    ),
     Middleware(AuthenticationMiddleware, backend=BasicAuthBackend()),
+    Middleware(CORSMiddleware, allow_origins=["*"]),
 ]
 
 
