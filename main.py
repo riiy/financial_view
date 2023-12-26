@@ -1,10 +1,8 @@
-import base64
 import contextlib
 import random
 
 import databases
 import jwt
-import pyotp
 from loguru import logger
 from starlette.applications import Starlette
 from starlette.authentication import (
@@ -69,10 +67,6 @@ for table in metadata.tables.values():
 
 
 class Login(HTTPEndpoint):
-    def _gettotp(self, email):
-        b32str = base64.b32encode(bytearray(email, "ascii")).decode("utf-8")
-        totp = pyotp.TOTP(b32str, interval=settings.EMAIL_OTP_INTERVAL)
-        return totp
 
     def _send_verify_code_task(self, email, verify_code):
         """."""
