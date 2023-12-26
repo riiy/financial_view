@@ -1,5 +1,6 @@
 import contextlib
 import random
+from datetime import datetime, timedelta
 
 import databases
 import jwt
@@ -80,18 +81,16 @@ class Login(HTTPEndpoint):
     async def post(self, request):
         req = await request.json()
         email = req["email"]
-        value = {"email": email}
-        query = "SELECT verify_code FROM auth.user WHERE email = :email"
-        result = await database.fetch_one(query=query, values=value)
-        if not result:
-            query = user.insert()
-            await database.execute(query=query, values=value)
-        if result[0] != req['captcha']:
+        resp = {"email": email}
+        values = {"email": email, "interval": datetime.now() - timedelta(seconds=int(settings.EMAIL_INTERVAL))}
+        query = "SELECT verify_code FROM auth.user WHERE email = :email and update_time > :interval;"
+        result = await database.fetch_one(query=query, values=values)
+        if not result or result.verify_code != req['captcha']:
             raise HTTPException(status_code=401)
-        value["token"] = jwt.encode(value, str(settings.SECRET_KEY), algorithm="HS256")
-        value["type"] = "email"
-        value["currentAuthority"] = "user"
-        return OrjsonResponse(value)
+        resp["token"] = jwt.encode(resp, str(settings.SECRET_KEY), algorithm="HS256")
+        resp["type"] = "email"
+        resp["currentAuthority"] = "user"
+        return OrjsonResponse(resp)
 
     async def get(self, request):
         email = request.query_params.get("email")
@@ -106,7 +105,7 @@ class Login(HTTPEndpoint):
         task = BackgroundTask(
             self._send_verify_code_task, email=email, verify_code=verify_code
         )
-        message = {"detail": "check email", "interval": settings.EMAIL_OTP_INTERVAL}
+        message = {"detail": "check email", "interval": settings.EMAIL_INTERVAL}
         return OrjsonResponse(message, background=task)
 
 
@@ -141,7 +140,6 @@ async def current_user(request):
 login_route = [
     Route("/login/account", endpoint=Login),
     Route("/login/captcha", methods=["GET"], endpoint=Login),
-    Route("/current-user", methods=["GET"], endpoint=current_user),
 ]
 
 routes = [
