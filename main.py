@@ -35,8 +35,16 @@ class Api(HTTPEndpoint):
     async def get(self, request):
         path = request.url.path.split("/")[-1]
         table = tables[path]
-        query = table.select().filter_by(sysmbol="sz.000002")
-        results = await database.fetch_all(query)
+        async with database.transaction():
+            if request.user.is_authenticated:
+                email = request.user.display_name
+                logger.info(email)
+                await database.execute(f"set role {settings.AUTH_ROLE};")
+                await database.execute(
+                    f"select set_config('user.jwt.claims.email','{email}',true);"
+                )
+            query = table.select()
+            results = await database.fetch_all(query)
         return OrjsonResponse([dict(row) for row in results])
 
     async def post(self, request):
@@ -49,15 +57,6 @@ class Api(HTTPEndpoint):
         return OrjsonResponse({"hello": "delete"})
 
 
-@requires("authenticated")
-async def handler(request):
-    path = request.url.path.split("/")[-1]
-    table = tables[path]
-    query = table.select()
-    results = await database.fetch_all(query)
-    return OrjsonResponse([dict(row) for row in results])
-
-
 model_routes = []
 for table in metadata.tables.values():
     if table.schema.__str__() in ["auth"]:
@@ -68,7 +67,6 @@ for table in metadata.tables.values():
 
 
 class Login(HTTPEndpoint):
-
     def _send_verify_code_task(self, email, verify_code):
         """."""
         send_mail(
@@ -82,10 +80,13 @@ class Login(HTTPEndpoint):
         req = await request.json()
         email = req["email"]
         resp = {"email": email}
-        values = {"email": email, "interval": datetime.now() - timedelta(seconds=int(settings.EMAIL_INTERVAL))}
+        values = {
+            "email": email,
+            "interval": datetime.now() - timedelta(seconds=int(settings.EMAIL_INTERVAL)),
+        }
         query = "SELECT verify_code FROM auth.user WHERE email = :email and update_time > :interval;"
         result = await database.fetch_one(query=query, values=values)
-        if not result or result.verify_code != req['captcha']:
+        if not result or result.verify_code != req["captcha"]:
             raise HTTPException(status_code=401)
         resp["token"] = jwt.encode(resp, str(settings.SECRET_KEY), algorithm="HS256")
         resp["type"] = "email"
@@ -128,20 +129,12 @@ class BasicAuthBackend(AuthenticationBackend):
         return AuthCredentials(["authenticated"]), SimpleUser(email)
 
 
-@requires("authenticated")
-async def current_user(request):
-    """."""
-    user = request.user
-    logger.info(user.display_name)
-    user = {"email": user.display_name}
-    return OrjsonResponse(user)
-
-
 login_route = [
     Route("/login/account", endpoint=Login),
     Route("/login/captcha", methods=["GET"], endpoint=Login),
 ]
 
+# routes
 routes = [
     Mount("/api", routes=model_routes + login_route),
 ]
