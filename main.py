@@ -110,6 +110,17 @@ class Login(HTTPEndpoint):
         return OrjsonResponse(message, background=task)
 
 
+login_route = [
+    Route("/login/account", endpoint=Login),
+    Route("/login/captcha", methods=["GET"], endpoint=Login),
+]
+
+# routes
+routes = [
+    Mount("/api", routes=model_routes + login_route),
+]
+
+
 class BasicAuthBackend(AuthenticationBackend):
     async def authenticate(self, conn):
         if "Authorization" not in conn.headers:
@@ -128,16 +139,6 @@ class BasicAuthBackend(AuthenticationBackend):
         email = decoded["email"]
         return AuthCredentials(["authenticated"]), SimpleUser(email)
 
-
-login_route = [
-    Route("/login/account", endpoint=Login),
-    Route("/login/captcha", methods=["GET"], endpoint=Login),
-]
-
-# routes
-routes = [
-    Mount("/api", routes=model_routes + login_route),
-]
 
 middleware = [
     Middleware(AuthenticationMiddleware, backend=BasicAuthBackend()),
