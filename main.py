@@ -5,14 +5,11 @@ from datetime import datetime, timedelta
 import databases
 import jwt
 from loguru import logger
+from sqlalchemy.dialects.postgresql import insert
 from starlette.applications import Starlette
-from starlette.authentication import (
-    AuthCredentials,
-    AuthenticationBackend,
-    AuthenticationError,
-    SimpleUser,
-    requires,
-)
+from starlette.authentication import (AuthCredentials, AuthenticationBackend,
+                                      AuthenticationError, SimpleUser,
+                                      requires)
 from starlette.background import BackgroundTask
 from starlette.endpoints import HTTPEndpoint
 from starlette.exceptions import HTTPException
@@ -21,7 +18,6 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.routing import Mount, Route
-from sqlalchemy.dialects.postgresql import insert
 
 import settings
 from models import metadata, user
@@ -32,9 +28,11 @@ tables = {}
 
 
 class Api(HTTPEndpoint):
+    """API."""
     async def get(self, request):
+        """GET."""
         path = request.url.path.split("/")[-1]
-        table = tables[path]
+        model = tables[path]
         async with database.transaction():
             if request.user.is_authenticated:
                 email = request.user.display_name
@@ -43,30 +41,36 @@ class Api(HTTPEndpoint):
                 await database.execute(
                     f"select set_config('user.jwt.claims.email','{email}',true);"
                 )
-            query = table.select()
+            query = model.select()
             results = await database.fetch_all(query)
         return OrjsonResponse([dict(row) for row in results])
 
     async def post(self, request):
+        """POST."""
+        logger.info(request)
         return OrjsonResponse({"hello": "post"})
 
     async def put(self, request):
+        """."""
+        logger.info(request)
         return OrjsonResponse({"hello": "put"})
 
     async def delete(self, request):
+        """."""
+        logger.info(request)
         return OrjsonResponse({"hello": "delete"})
 
 
 model_routes = []
 for table in metadata.tables.values():
-    if table.schema.__str__() in ["auth"]:
+    if str(table.schema) in ["auth"]:
         continue
-
-    model_routes.append(Route(f"/{table.name.__str__()}", endpoint=Api))
-    tables[table.name.__str__()] = table
+    model_routes.append(Route(f"/{str(table.name)}", endpoint=Api))
+    tables[str(table.name)] = table
 
 
 class Login(HTTPEndpoint):
+    """LOGIN."""
     def _send_verify_code_task(self, email, verify_code):
         """."""
         send_mail(
@@ -77,6 +81,7 @@ class Login(HTTPEndpoint):
         )
 
     async def post(self, request):
+        """."""
         req = await request.json()
         email = req["email"]
         resp = {"email": email}
@@ -94,13 +99,14 @@ class Login(HTTPEndpoint):
         return OrjsonResponse(resp)
 
     async def get(self, request):
+        """."""
         email = request.query_params.get("email")
         if not email:
             raise HTTPException(status_code=401)
         verify_code = str(random.randint(1000, 9999))
         insert_stmt = insert(user).values(email=email, verify_code=verify_code)
         do_update_stmt = insert_stmt.on_conflict_do_update(
-            constraint="user_pkey", set_=dict(verify_code=verify_code)
+            constraint="user_pkey", set_={"verify_code": verify_code}
         )
         await database.execute(do_update_stmt)
         task = BackgroundTask(
@@ -122,7 +128,9 @@ routes = [
 
 
 class BasicAuthBackend(AuthenticationBackend):
+    """AuthBackend."""
     async def authenticate(self, conn):
+        """."""
         if "Authorization" not in conn.headers:
             return
 
@@ -148,12 +156,14 @@ middleware = [
 
 @contextlib.asynccontextmanager
 async def lifespan(app):
+    """."""
     await database.connect()
     yield
     await database.disconnect()
 
 
 async def http_exception(request: Request, exc: HTTPException):
+    """."""
     return OrjsonResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 
