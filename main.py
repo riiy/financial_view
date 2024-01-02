@@ -2,6 +2,7 @@ import contextlib
 import random
 from datetime import datetime, timedelta
 from typing import Dict
+import httpx
 
 import databases
 import jwt
@@ -19,6 +20,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.routing import Mount, Route
+from starlette.responses import Response
 
 import settings
 from models import metadata, users
@@ -128,9 +130,38 @@ login_route = [
     Route("/login/captcha", methods=["GET"], endpoint=Login),
 ]
 
+
+async def spot(request):
+    """."""
+    url = "http://82.push2.eastmoney.com/api/qt/clist/get"
+    page = request.query_params.get('page', 1)
+    if page > 480:
+        raise HTTPException(status_code=404)
+    params = {
+        "pn": f"{page}",
+        "pz": "100",
+        "po": "1",
+        "np": "1",
+        "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+        "fltt": "2",
+        "invt": "2",
+        "fid": "f3",
+        "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048",
+        "fields": "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152",
+        "_": "1623833739532",
+    }
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, params=params)
+
+    return Response(resp.text, media_type='application/json')
+
+
+proxy_route = [
+    Route("/proxy/spot", endpoint=spot),
+]
 # routes
 routes = [
-    Mount("/api", routes=model_routes + login_route),
+    Mount("/api", routes=model_routes + login_route + proxy_route),
 ]
 
 

@@ -17,6 +17,7 @@ itsdangerous = "^2.1.2"
 orjson = "^3.9.10"
 pyjwt = "^2.8.0"
 loguru = "^0.7.2"
+httpx = "^0.26.0"
 
 
 [build-system]
