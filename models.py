@@ -3,8 +3,8 @@ from sqlalchemy.sql import func
 
 metadata = sa.MetaData()
 
-user = sa.Table(
-    "user",
+users = sa.Table(
+    "users",
     metadata,
     sa.Column("email", sa.String, primary_key=True),
     sa.Column("verify_code", sa.String, nullable=True),
@@ -25,18 +25,19 @@ user = sa.Table(
     schema="auth",
 )
 
-stock = sa.Table(
-    "stock",
+profiles = sa.Table(
+    "profiles",
     metadata,
-    sa.Column("symbol", sa.String, primary_key=True),
-    sa.Column("name", sa.String, nullable=False, index=True),
+    sa.Column("email", sa.String, sa.ForeignKey("auth.users.email"), primary_key=True),
+    sa.Column("name", sa.String, nullable=True),
     schema="public",
 )
 
-profile = sa.Table(
-    "profile",
+stocks = sa.Table(
+    "stocks",
     metadata,
-    sa.Column("email", sa.String, sa.ForeignKey("auth.user.email"), primary_key=True),
-    sa.Column("name", sa.String, nullable=True),
+    sa.Column("symbol", sa.String, primary_key=True),
+    sa.Column("name", sa.String, nullable=False, index=True),
+    sa.Column("exchange", sa.String, nullable=False, index=True),
     schema="public",
 )

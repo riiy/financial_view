@@ -1,15 +1,16 @@
 import contextlib
 import random
 from datetime import datetime, timedelta
+from typing import Dict
 
 import databases
 import jwt
+import sqlalchemy as sa
 from loguru import logger
 from sqlalchemy.dialects.postgresql import insert
 from starlette.applications import Starlette
 from starlette.authentication import (AuthCredentials, AuthenticationBackend,
-                                      AuthenticationError, SimpleUser,
-                                      requires)
+                                      AuthenticationError, SimpleUser)
 from starlette.background import BackgroundTask
 from starlette.endpoints import HTTPEndpoint
 from starlette.exceptions import HTTPException
@@ -20,23 +21,27 @@ from starlette.requests import Request
 from starlette.routing import Mount, Route
 
 import settings
-from models import metadata, user
+from models import metadata, users
 from utils import OrjsonResponse, send_mail
 
 database = databases.Database(settings.DATABASE_URL)
-tables = {}
+tables: Dict[str, sa.Table] = {}
 
 
 class Api(HTTPEndpoint):
     """API."""
+
     async def get(self, request):
         """GET."""
         path = request.url.path.split("/")[-1]
         model = tables[path]
+        logger.info(model.c)
+        for i in model.c:
+            logger.info(i)
+        logger.info(model.foreign_keys)
         async with database.transaction():
             if request.user.is_authenticated:
                 email = request.user.display_name
-                logger.info(email)
                 await database.execute(f"set role {settings.AUTH_ROLE};")
                 await database.execute(
                     f"select set_config('user.jwt.claims.email','{email}',true);"
@@ -71,6 +76,7 @@ for table in metadata.tables.values():
 
 class Login(HTTPEndpoint):
     """LOGIN."""
+
     def _send_verify_code_task(self, email, verify_code):
         """."""
         send_mail(
@@ -87,7 +93,8 @@ class Login(HTTPEndpoint):
         resp = {"email": email}
         values = {
             "email": email,
-            "interval": datetime.now() - timedelta(seconds=int(settings.EMAIL_INTERVAL)),
+            "interval": datetime.now()
+            - timedelta(seconds=int(settings.EMAIL_INTERVAL)),
         }
         query = "SELECT verify_code FROM auth.user WHERE email = :email and update_time > :interval;"
         result = await database.fetch_one(query=query, values=values)
@@ -104,7 +111,7 @@ class Login(HTTPEndpoint):
         if not email:
             raise HTTPException(status_code=401)
         verify_code = str(random.randint(1000, 9999))
-        insert_stmt = insert(user).values(email=email, verify_code=verify_code)
+        insert_stmt = insert(users).values(email=email, verify_code=verify_code)
         do_update_stmt = insert_stmt.on_conflict_do_update(
             constraint="user_pkey", set_={"verify_code": verify_code}
         )
@@ -129,6 +136,7 @@ routes = [
 
 class BasicAuthBackend(AuthenticationBackend):
     """AuthBackend."""
+
     async def authenticate(self, conn):
         """."""
         if "Authorization" not in conn.headers:
