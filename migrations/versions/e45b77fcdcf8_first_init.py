@@ -16,7 +16,7 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-create_func = """CREATE FUNCTION update_update_time()
+create_func = """CREATE or replace FUNCTION update_update_time()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.update_time = now();

@@ -27,6 +27,7 @@ from models import metadata, users
 from utils import OrjsonResponse, send_mail
 
 database = databases.Database(settings.DATABASE_URL)
+
 tables: Dict[str, sa.Table] = {}
 
 
@@ -37,14 +38,10 @@ class Api(HTTPEndpoint):
         """GET."""
         path = request.url.path.split("/")[-1]
         model = tables[path]
-        logger.info(model.c)
-        for i in model.c:
-            logger.info(i)
-        logger.info(model.foreign_keys)
         async with database.transaction():
+            await database.execute(f"set role {settings.AUTH_ROLE};")
             if request.user.is_authenticated:
                 email = request.user.display_name
-                await database.execute(f"set role {settings.AUTH_ROLE};")
                 await database.execute(
                     f"select set_config('user.jwt.claims.email','{email}',true);"
                 )
@@ -135,7 +132,7 @@ async def spot(request):
     """."""
     url = "http://82.push2.eastmoney.com/api/qt/clist/get"
     page = request.query_params.get('page', 1)
-    if page > 480:
+    if int(page) > 480:
         raise HTTPException(status_code=404)
     params = {
         "pn": f"{page}",
