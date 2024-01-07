@@ -59,6 +59,7 @@ stocks = sa.Table(
     sa.Column("minute_5_growth", sa.Float, nullable=True, comment='5分钟涨跌'),
     sa.Column("day_60_growth", sa.Float, nullable=True, comment='60日涨跌幅'),
     sa.Column("this_year_growth", sa.Float, nullable=True, comment='年初至今涨跌幅'),
+    sa.Column("key", sa.String, server_default=sa.text('gen_random_uuid()')),
     schema="public",
 )
 
@@ -76,5 +77,6 @@ gold_list = sa.Table(
         index=True,
         server_default=func.now(),
     ),
+    sa.Column("key", sa.String, server_default=sa.text('gen_random_uuid()')),
     schema="public",
 )
