@@ -32,5 +32,5 @@ jobs:
         run: |
           service ssh status
           cd infrastructure/ansible
-          cat main.yml
+          cat site.yml
           ansible-playbook -vvv --private-key /home/runner/.ssh/id_rsa -u ${{secrets.ANSIBLE_DEPLOY_USER}} -t financial_view site.yml
