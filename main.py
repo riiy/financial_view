@@ -152,9 +152,13 @@ async def spot(request):
 
     return Response(resp.text, media_type='application/json')
 
+async def test(request):
+    message = {"detail": "test"}
+    return OrjsonResponse(message)
 
 proxy_route = [
     Route("/proxy/spot", endpoint=spot),
+    Route("/proxy/test", endpoint=test),
 ]
 # routes
 routes = [
