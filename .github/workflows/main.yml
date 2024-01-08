@@ -16,7 +16,6 @@ jobs:
     steps: 
       - uses: actions/checkout@v3
         with:
-          repository: 'git@github.com:riiy/infrastructure.git'
           submodules: true
           token: ${{secrets.REPO_TOKEN}}
       - name: Setup SSH 
@@ -32,6 +31,6 @@ jobs:
         shell: bash 
         run: |
           service ssh status
-          cd ansible
+          cd infrastructure/ansible
           cat site.yml
           ansible-playbook -vvv --private-key /home/runner/.ssh/id_rsa -u ${{secrets.ANSIBLE_DEPLOY_USER}} -t financial_view site.yml
