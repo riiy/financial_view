@@ -112,7 +112,7 @@ class Login(HTTPEndpoint):
         verify_code = str(random.randint(1000, 9999))
         insert_stmt = insert(users).values(email=email, verify_code=verify_code)
         do_update_stmt = insert_stmt.on_conflict_do_update(
-            constraint="user_pkey", set_={"verify_code": verify_code}
+            constraint="users_pkey", set_={"verify_code": verify_code}
         )
         await database.execute(do_update_stmt)
         task = BackgroundTask(
