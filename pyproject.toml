@@ -19,6 +19,13 @@ pyjwt = "^2.8.0"
 loguru = "^0.7.2"
 httpx = "^0.26.0"
 
+[tool.poetry.group.dev]
+optional = true
+
+
+[tool.poetry.group.dev.dependencies]
+isort = "^5.13.2"
+pyflakes = "^3.2.0"
 
 [build-system]
 requires = ["poetry-core"]
