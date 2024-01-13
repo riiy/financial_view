@@ -2,9 +2,9 @@ import contextlib
 import random
 from datetime import datetime, timedelta
 from typing import Dict
-import httpx
 
 import databases
+import httpx
 import jwt
 import sqlalchemy as sa
 from loguru import logger
@@ -19,8 +19,8 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.routing import Mount, Route
 from starlette.responses import Response
+from starlette.routing import Mount, Route
 
 import settings
 from models import metadata, users
@@ -131,7 +131,7 @@ login_route = [
 async def spot(request):
     """."""
     url = "http://82.push2.eastmoney.com/api/qt/clist/get"
-    page = request.query_params.get('page', 1)
+    page = request.query_params.get("page", 1)
     if int(page) > 480:
         raise HTTPException(status_code=404)
     params = {
@@ -150,7 +150,7 @@ async def spot(request):
     async with httpx.AsyncClient() as client:
         resp = await client.get(url, params=params)
 
-    return Response(resp.text, media_type='application/json')
+    return Response(resp.text, media_type="application/json")
 
 
 proxy_route = [

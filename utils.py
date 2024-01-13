@@ -1,4 +1,3 @@
-from typing import Any
 import smtplib
 from email.header import Header
 from email.mime.application import MIMEApplication
@@ -6,10 +5,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, parseaddr
 from os.path import basename, isfile
+from typing import Any
 from urllib.parse import quote
 
 import orjson
 from starlette.responses import JSONResponse
+
 import settings
 
 
